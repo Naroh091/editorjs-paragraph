@@ -4,7 +4,31 @@
 require('./index.css').toString();
 
 
+function snakeToCamel(str) {
+    return str.replace(/[^a-zA-Z0-9]+(.)/g, (m, chr) => chr.toUpperCase());
+}
+
 class Paragraph {
+
+
+    static get removableStyling() {
+        return ['font-family', 'font-variant', 'vertical-align', 'white-space', 'font-variant', 'font-variant-alternates',
+            'font-variant-caps', 'font-variant-east-asian', 'font-variant-ligatures', 'font-variant-numeric',
+            'font-variant-position', 'font-variant-settings', 'text-decoration-line', 'text-decoration-color', 'text-decoration-style',
+            'text-decoration-thickness', 'text-decoration', 'text-decoration-skip-ink'];
+    }
+
+    static get removableStylingIfDefault() {
+        return {
+            'font-size': '11pt',
+            'color': ['rgb(0, 0, 0)', 'rgb(17, 85, 204)'],
+            'background-color': 'transparent',
+            'font-weight': '400',
+            'font-style': 'normal',
+            'text-decoration': 'none'
+        };
+    }
+
     /**
      * Default placeholder for Paragraph Tool
      *
@@ -221,8 +245,10 @@ class Paragraph {
      */
     onPaste(event) {
 
+        let sanitizedText = this.api.sanitizer.clean(event.detail.data.innerHTML, this.sanitizerConfig())
+
         const data = {
-            text: this.api.sanitizer.clean(event.detail.data.innerHTML, this.sanitizerConfig()),
+            text: sanitizedText.replaceAll('&nbsp;', ' '),
             alignment: this.config.defaultAlignment || Paragraph.DEFAULT_ALIGNMENT
         };
 
@@ -262,29 +288,6 @@ class Paragraph {
         return {
             export: 'text', // to convert Paragraph to other block, use 'text' property of saved data
             import: 'text' // to covert other block's exported string to Paragraph, fill 'text' property of tool data
-        };
-    }
-
-    /**
-     * Sanitizer rules
-     */
-    static get sanitize() {
-        return {
-            b: true, // leave <b>
-            p: {}, // leave <p> without attributes
-            span: function (el) {
-                for (let i = el.style.length; i--;) {
-                    let nameString = el.style[i];
-                    if (nameString != 'font-weight' && nameString != 'font-style' && nameString != 'font-size' && nameString != 'color')
-                        el.style.removeProperty(nameString);
-                }
-                if (el.style.length == 0 || (el.style.fontWeight != '' && el.style.fontWeight <= 400)) return false;
-                else return el;
-            },
-            font: true,
-            a: true,
-            i: true,
-            u: true
         };
     }
 
@@ -361,25 +364,39 @@ class Paragraph {
         };
     }
 
+
     sanitizerConfig() {
+
         return {
             b: true, // leave <b>
             p: {}, // leave <p> without attributes
-            span: function (el) {
-                for (let i = el.style.length; i--;) {
-                    let nameString = el.style[i];
-                    if (nameString != 'font-weight' && nameString != 'font-style' && nameString != 'font-size' && nameString != 'color')
-                        el.style.removeProperty(nameString);
+            span: function (htmlTag) {
+                for (let i = htmlTag.style.length; i--;) {
+
+                    let property = htmlTag.style[i];
+
+                    if (Paragraph.removableStyling.includes(property)) {
+                        htmlTag.style.removeProperty(property);
+                    }
+
+                    Object.keys(Paragraph.removableStylingIfDefault).forEach(key => {
+                        if (key === property && Paragraph.removableStylingIfDefault[key].includes(htmlTag.style[snakeToCamel(key)])) {
+                            console.log("removing " + property);
+                            htmlTag.style.removeProperty(property);
+                        }
+                    });
+
                 }
-                if (el.style.length == 0 || (el.style.fontWeight != '' && el.style.fontWeight <= 400)) return false;
-                else return el;
+                return htmlTag;
             },
             font: true,
             a: true,
             i: true,
-            u: true
+            u: true,
         }
     }
+
+
 }
 
 module.exports = Paragraph;
